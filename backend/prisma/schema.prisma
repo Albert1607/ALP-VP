@@ -1,0 +1,203 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Gender {
+  MALE
+  FEMALE
+}
+
+enum ActivityLevel {
+  SEDENTARY
+  LIGHT
+  MODERATE
+  ACTIVE
+  VERY_ACTIVE
+}
+
+enum Goal {
+  LOSE_WEIGHT
+  MAINTAIN
+  GAIN_WEIGHT
+}
+
+enum MealSlot {
+  BREAKFAST
+  LUNCH
+  DINNER
+}
+
+enum BudgetPeriod {
+  DAILY
+  WEEKLY
+  MONTHLY
+}
+
+enum PlanStatus {
+  GENERATED
+  APPROVED
+  REJECTED
+  UNVERIFIED
+}
+
+enum WeightType {
+  GROSS
+  NET
+  FILL_PERCENT
+  VOLUME
+}
+
+model User {
+  id              String           @id @default(uuid())
+  email           String           @unique
+  passwordHash    String
+  timezone        String           @default("Asia/Jakarta")
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  profile         BodyProfile?
+  weightLogs      WeightLog[]
+  fridgeItems     FridgeItem[]
+  budget          Budget?
+  mealLogs        MealLog[]
+  foodPlans       FoodPlan[]
+  reminderSetting ReminderSetting?
+}
+
+model BodyProfile {
+  id                       String        @id @default(uuid())
+  userId                   String        @unique
+  user                     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  gender                   Gender
+  weightKg                 Float
+  heightCm                 Float
+  age                      Int
+  activityLevel            ActivityLevel
+  calibratedActivityFactor Float?
+  goal                     Goal
+  createdAt                DateTime      @default(now())
+  updatedAt                DateTime      @updatedAt
+}
+
+model WeightLog {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  weightKg  Float
+  date      DateTime @default(now())
+  createdAt DateTime @default(now())
+}
+
+model Food {
+  id              String         @id @default(uuid())
+  name            String         @unique // stored as lowercase & trimmed
+  kcalPer100g     Float
+  proteinPer100g  Float
+  carbPer100g     Float
+  fatPer100g      Float
+  source          String         @default("SYSTEM") // SYSTEM, USER, AI
+  createdByUserId String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  mealLogItems    MealLogItem[]
+  foodPlanMeals   FoodPlanMeal[]
+}
+
+model MealLog {
+  id        String        @id @default(uuid())
+  userId    String
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  slot      MealSlot
+  date      DateTime
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  items     MealLogItem[]
+}
+
+model MealLogItem {
+  id        String   @id @default(uuid())
+  mealLogId String
+  mealLog   MealLog  @relation(fields: [mealLogId], references: [id], onDelete: Cascade)
+  foodId    String
+  food      Food     @relation(fields: [foodId], references: [id])
+  grams     Float
+}
+
+model FridgeItem {
+  id                String     @id @default(uuid())
+  userId            String
+  user              User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name              String
+  weightType        WeightType @default(NET)
+  rawQuantity       Float      @default(0)
+  quantityGramsOrMl Float      // Net quantity in grams/ml
+  tareWeight        Float      @default(0)
+  fillPercent       Float      @default(100)
+  containerCapacity Float      @default(0)
+  densityGPerMl     Float      @default(1.0)
+  expiryDate        DateTime?
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+}
+
+model Budget {
+  id        String       @id @default(uuid())
+  userId    String       @unique
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  amountIdr Float
+  period    BudgetPeriod
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+}
+
+model PriceCache {
+  id            String   @id @default(uuid())
+  foodName      String   @unique // stored as lowercase & trimmed
+  priceIdrPerKg Float
+  source        String   @default("ai_estimate") // ai_estimate, user
+  updatedAt     DateTime @updatedAt
+}
+
+model FoodPlan {
+  id            String         @id @default(uuid())
+  userId        String
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date          DateTime       @default(now())
+  targetKcal    Float
+  targetProtein Float
+  totalCostIdr  Float
+  status        PlanStatus     @default(GENERATED)
+  createdAt     DateTime       @default(now())
+
+  meals         FoodPlanMeal[]
+}
+
+model FoodPlanMeal {
+  id               String   @id @default(uuid())
+  foodPlanId       String
+  foodPlan         FoodPlan @relation(fields: [foodPlanId], references: [id], onDelete: Cascade)
+  slot             MealSlot
+  foodId           String
+  food             Food     @relation(fields: [foodId], references: [id])
+  grams            Float
+  estimatedCostIdr Float
+}
+
+model ReminderSetting {
+  id            String   @id @default(uuid())
+  userId        String   @unique
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  enabled       Boolean  @default(true)
+  breakfastTime String   @default("08:00")
+  lunchTime     String   @default("12:30")
+  dinnerTime    String   @default("19:00")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
